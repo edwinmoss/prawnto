@@ -9,6 +9,9 @@ module Prawn
       mod.send :alias_method, :text_without_formatting, :text
       mod.send :alias_method, :text, :text_with_formatting
 
+      mod.send :alias_method, :width_of_without_formatting, :width_of
+      mod.send :alias_method, :width_of, :width_of_with_formatting
+
       mod.send :alias_method, :height_of_without_formatting, :height_of
       mod.send :alias_method, :height_of, :height_of_with_formatting
     end
@@ -33,10 +36,23 @@ module Prawn
       end
     end
 
+    # Overloaded version of #width_of. Call via #width_of, rather than
+    # #width_of_with_formatting (see above, where it aliased to #width_of).
+    def width_of_with_formatting(string, options={}) #:nodoc:
+      if unformatted?(string, options)
+        width_of_without_formatting(string, options)
+      else
+        formatted_width(string, options)
+      end
+    end
+
     DEFAULT_TAGS = {
       :a      => { :meta => { :name => :anchor, :href => :target }, :color => "0000ff", :text_decoration => :underline },
       :b      => { :font_weight => :bold },
       :br     => { :display => :break },
+      :strong => { :display => :break },
+      :center => { :display => :block, :text_align => :center },
+      :div    => { :display => :block },
       :code   => { :font_family => "Courier", :font_size => "90%" },
       :em     => { :font_style => :italic },
       :font   => { :meta => { :face => :font_family, :color => :color, :size => :font_size } },
@@ -186,9 +202,15 @@ module Prawn
         start_new_page if self.y < bounds.absolute_bottom
 
         until helper.done?
+          # My fix
+          # x = column * width
+          # y = self.y - bounds.absolute_bottom
+          # height = bounds.height > 0 ? bounds.height : bounds.absolute_top
+          # self.y = helper.fill(x, y, options.merge(:width => width - gap, :height => height)) + bounds.absolute_bottom
+          # Let's try their fix
           y = self.y - bounds.absolute_bottom
           height = bounds.stretchy? ? bounds.absolute_top : y
-
+          
           y = helper.fill(bounds.left, y, bounds.width, options.merge(:height => height))
 
           if helper.done?
@@ -200,9 +222,14 @@ module Prawn
       end
 
       def formatted_height(string, line_width, size=font_size, options={})
-        helper = layout(string, options.merge(:size => font_size))
+        helper = layout(string, options.merge(:size => size))
         lines = helper.word_wrap(line_width)
         return lines.inject(0) { |s, line| s + line.height }
+      end
+
+      def formatted_width(string, options={})
+        helper = layout(string, options)
+        helper.next.width
       end
   end
 end
